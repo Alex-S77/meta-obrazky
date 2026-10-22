@@ -4,6 +4,8 @@ on:
   schedule:
     - cron: "15 3,9,15,21 * * *"   # 4x denne (UTC)
   workflow_dispatch:
+  push:
+    branches: [main]
 
 permissions:
   contents: read
