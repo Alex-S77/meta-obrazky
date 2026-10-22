@@ -218,9 +218,16 @@ def build(items, out_dir, base_url, photos):
         w = csv.writer(fh, delimiter=";")
         w.writerow(["g:id", "g:image_link"])
         w.writerows(rows)
+    # contact sheet of the first 12 images for a quick visual check
+    sheet = Image.new("RGB", (4 * 360, 3 * 360), WHITE)
+    for i, (_, url) in enumerate(rows[:12]):
+        tile = Image.open(os.path.join(out_dir, "img", url.rsplit("/", 1)[1])).resize((360, 360))
+        sheet.paste(tile, ((i % 4) * 360, (i // 4) * 360))
+    sheet.save(os.path.join(out_dir, "nahlad.jpg"), quality=85)
     with open(os.path.join(out_dir, "index.html"), "w", encoding="utf-8") as fh:
         fh.write("<!doctype html><meta charset=utf-8><title>Futbalový sen – Meta obrázky</title>"
-                 f"<p>{len(rows)} obrázkov. <a href='images.csv'>images.csv</a></p>")
+                 f"<p>{len(rows)} obrázkov. <a href='images.csv'>images.csv</a></p>"
+                 "<img src='nahlad.jpg' style='max-width:100%'>")
     print(f"rendered {len(rows)} images")
 
 

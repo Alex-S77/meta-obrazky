@@ -8,7 +8,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -32,6 +32,13 @@ jobs:
         uses: actions/configure-pages@v5
       - name: Render images
         run: python generate.py "${{ vars.FEED_URL || 'https://feeds.mergado.com/futbalovysen-sk-facebook-com-sk-844f781c951410ad991176f880c243be.xml' }}" site "${{ steps.pages.outputs.base_url }}"
+      - name: Publish preview to branch nahlad
+        run: |
+          mkdir /tmp/nahlad && cp site/nahlad.jpg site/images.csv /tmp/nahlad/
+          cd /tmp/nahlad && git init -q -b nahlad
+          git -c user.name=github-actions -c user.email=actions@github.com commit -q --allow-empty -m nahlad
+          git add -A && git -c user.name=github-actions -c user.email=actions@github.com commit -q -m "Náhľad"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" nahlad
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
