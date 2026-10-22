@@ -1,6 +1,6 @@
 """Render Meta catalog images (design C, "vstupenka") for Futbalový sen.
 
-Reads the Mergado Meta feed, draws a 1080x1080 ticket-style card per match from
+Reads the product feed from the web (the Mergado input, original photos), draws a 1080x1080 ticket-style card per match from
 the match photo and feed data, and writes the site for GitHub Pages:
 
   site/img/<id>-<hash>.jpg   one image per match; the hash changes with the
@@ -185,7 +185,8 @@ def render(p, photo):
 # ---------- pipeline ----------
 
 def fetch_photo(url, cache):
-    if not url:
+    # never re-render our own output (the Meta feed carries it after the import)
+    if not url or "github.io" in url:
         return None
     if url in cache:
         return cache[url]
