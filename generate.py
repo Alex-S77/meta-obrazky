@@ -240,7 +240,7 @@ def is_sk(items):
 def fetch_sk_feed(feed_url, tries=8, wait=45):
     """The web's feed cache flips between the SK and the CZ feed (fotbalovysen.cz,
     other ids); CZ items match nothing in Mergado. Bust the cache and retry until
-    the SK one comes back, otherwise fail so the last good deploy stays."""
+    the SK one comes back, otherwise give up so the last good deploy stays."""
     for i in range(tries):
         sep = "&" if "?" in feed_url else "?"
         r = requests.get(f"{feed_url}{sep}nocache={int(time.time())}{i}", headers=UA, timeout=120)
@@ -251,7 +251,7 @@ def fetch_sk_feed(feed_url, tries=8, wait=45):
             return items, r.content
         print(f"try {i + 1}: not the SK feed ({len(items)} items)", file=sys.stderr)
         time.sleep(wait)
-    sys.exit("feed is not the SK one, keeping the last deploy")
+    return None, None
 
 
 def main():
@@ -264,6 +264,13 @@ def main():
         return
     feed_url, out, base_url = sys.argv[1:4]
     items, raw = fetch_sk_feed(feed_url)
+    if items is None:
+        # not an error worth a failure e-mail every hour: skip, the last deploy stays
+        print("feed is not the SK one, keeping the last deploy")
+        if os.environ.get("GITHUB_OUTPUT"):
+            with open(os.environ["GITHUB_OUTPUT"], "a") as fh:
+                fh.write("skip=true\n")
+        return
     cache = {}
     urls = sorted({p.get("image_link", "") for p in items})
     with ThreadPoolExecutor(8) as ex:

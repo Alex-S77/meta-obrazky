@@ -31,8 +31,10 @@ jobs:
       - id: pages
         uses: actions/configure-pages@v5
       - name: Render images
+        id: render
         run: python generate.py "${{ vars.FEED_URL || 'https://futbalovysen.sk/?fs_feed=zapasy' }}" site "${{ steps.pages.outputs.base_url }}"
       - name: Publish preview to branch nahlad
+        if: steps.render.outputs.skip != 'true'
         run: |
           mkdir /tmp/nahlad && cp site/nahlad.jpg site/images.csv site/feed-sk.xml /tmp/nahlad/
           cd /tmp/nahlad && git init -q -b nahlad
@@ -40,7 +42,9 @@ jobs:
           git add -A && git -c user.name=github-actions -c user.email=actions@github.com commit -q -m "Náhľad"
           git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" nahlad
       - uses: actions/upload-pages-artifact@v3
+        if: steps.render.outputs.skip != 'true'
         with:
           path: site
       - id: deploy
+        if: steps.render.outputs.skip != 'true'
         uses: actions/deploy-pages@v4
