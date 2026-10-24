@@ -244,6 +244,11 @@ def main():
     r = requests.get(feed_url, headers=UA, timeout=120)
     r.raise_for_status()
     items = parse_feed(r.content)
+    # the web serves the Czech feed (fotbalovysen.cz, other ids) to non-SK visitors;
+    # publishing that would match no product in Mergado, so keep the last good deploy
+    foreign = [p for p in items if "futbalovysen.sk" not in p.get("link", "")]
+    if not items or len(foreign) > len(items) // 10:
+        sys.exit(f"feed is not the SK one: {len(foreign)} of {len(items)} items link elsewhere")
     cache = {}
     urls = sorted({p.get("image_link", "") for p in items})
     with ThreadPoolExecutor(8) as ex:

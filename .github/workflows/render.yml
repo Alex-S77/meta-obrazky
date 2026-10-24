@@ -31,7 +31,7 @@ jobs:
       - id: pages
         uses: actions/configure-pages@v5
       - name: Render images
-        run: python generate.py "${{ vars.FEED_URL || 'https://futbalovysen.sk/?fs_feed=zapasy' }}" site "${{ steps.pages.outputs.base_url }}"
+        run: python generate.py "${{ vars.FEED_URL || 'https://feeds.mergado.com/futbalovysen-sk-google-nakupy-sk-8ba38781738c46cf6b654f3cefab35ba.xml' }}" site "${{ steps.pages.outputs.base_url }}"
       - name: Publish preview to branch nahlad
         run: |
           mkdir /tmp/nahlad && cp site/nahlad.jpg site/images.csv /tmp/nahlad/
