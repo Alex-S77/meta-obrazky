@@ -10,7 +10,7 @@ the match photo and feed data, and writes the site for GitHub Pages:
 Usage: python generate.py FEED_URL OUT_DIR BASE_URL
        python generate.py --sample OUT_DIR   (offline preview from sample.xml)
 """
-import csv, hashlib, io, os, re, sys, xml.etree.ElementTree as ET
+import csv, hashlib, io, os, re, sys, time, xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
@@ -232,6 +232,28 @@ def build(items, out_dir, base_url, photos):
     print(f"rendered {len(rows)} images")
 
 
+def is_sk(items):
+    foreign = [p for p in items if "futbalovysen.sk" not in p.get("link", "")]
+    return bool(items) and len(foreign) <= len(items) // 10
+
+
+def fetch_sk_feed(feed_url, tries=8, wait=45):
+    """The web's feed cache flips between the SK and the CZ feed (fotbalovysen.cz,
+    other ids); CZ items match nothing in Mergado. Bust the cache and retry until
+    the SK one comes back, otherwise fail so the last good deploy stays."""
+    for i in range(tries):
+        sep = "&" if "?" in feed_url else "?"
+        r = requests.get(f"{feed_url}{sep}nocache={int(time.time())}{i}", headers=UA, timeout=120)
+        r.raise_for_status()
+        items = parse_feed(r.content)
+        if is_sk(items):
+            print(f"SK feed on try {i + 1}: {len(items)} items")
+            return items
+        print(f"try {i + 1}: not the SK feed ({len(items)} items)", file=sys.stderr)
+        time.sleep(wait)
+    sys.exit("feed is not the SK one, keeping the last deploy")
+
+
 def main():
     if sys.argv[1] == "--sample":
         out = sys.argv[2]
@@ -241,14 +263,7 @@ def main():
         build(items, out, "https://example.invalid", photos)
         return
     feed_url, out, base_url = sys.argv[1:4]
-    r = requests.get(feed_url, headers=UA, timeout=120)
-    r.raise_for_status()
-    items = parse_feed(r.content)
-    # the web serves the Czech feed (fotbalovysen.cz, other ids) to non-SK visitors;
-    # publishing that would match no product in Mergado, so keep the last good deploy
-    foreign = [p for p in items if "futbalovysen.sk" not in p.get("link", "")]
-    if not items or len(foreign) > len(items) // 10:
-        sys.exit(f"feed is not the SK one: {len(foreign)} of {len(items)} items link elsewhere")
+    items = fetch_sk_feed(feed_url)
     cache = {}
     urls = sorted({p.get("image_link", "") for p in items})
     with ThreadPoolExecutor(8) as ex:
