@@ -2,7 +2,7 @@ name: Meta obrázky
 
 on:
   schedule:
-    - cron: "15 3,9,15,21 * * *"   # 4x denne (UTC)
+    - cron: "15 * * * *"   # každú hodinu
   workflow_dispatch:
   push:
     branches: [main]
@@ -34,7 +34,7 @@ jobs:
         run: python generate.py "${{ vars.FEED_URL || 'https://futbalovysen.sk/?fs_feed=zapasy' }}" site "${{ steps.pages.outputs.base_url }}"
       - name: Publish preview to branch nahlad
         run: |
-          mkdir /tmp/nahlad && cp site/nahlad.jpg site/images.csv /tmp/nahlad/
+          mkdir /tmp/nahlad && cp site/nahlad.jpg site/images.csv site/feed-sk.xml /tmp/nahlad/
           cd /tmp/nahlad && git init -q -b nahlad
           git -c user.name=github-actions -c user.email=actions@github.com commit -q --allow-empty -m nahlad
           git add -A && git -c user.name=github-actions -c user.email=actions@github.com commit -q -m "Náhľad"

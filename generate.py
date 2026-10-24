@@ -248,7 +248,7 @@ def fetch_sk_feed(feed_url, tries=8, wait=45):
         items = parse_feed(r.content)
         if is_sk(items):
             print(f"SK feed on try {i + 1}: {len(items)} items")
-            return items
+            return items, r.content
         print(f"try {i + 1}: not the SK feed ({len(items)} items)", file=sys.stderr)
         time.sleep(wait)
     sys.exit("feed is not the SK one, keeping the last deploy")
@@ -263,12 +263,15 @@ def main():
         build(items, out, "https://example.invalid", photos)
         return
     feed_url, out, base_url = sys.argv[1:4]
-    items = fetch_sk_feed(feed_url)
+    items, raw = fetch_sk_feed(feed_url)
     cache = {}
     urls = sorted({p.get("image_link", "") for p in items})
     with ThreadPoolExecutor(8) as ex:
         list(ex.map(lambda u: fetch_photo(u, cache), urls))
     build(items, out, base_url, cache)
+    # verified SK copy of the feed, Mergado's SK projects import this instead of the web
+    with open(os.path.join(out, "feed-sk.xml"), "wb") as fh:
+        fh.write(raw)
 
 
 if __name__ == "__main__":
