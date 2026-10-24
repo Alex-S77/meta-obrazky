@@ -5,8 +5,8 @@ Raz za 6 hodín stiahne SK feed zápasov (s pôvodnými fotkami), vyrobí ku ka�
 súborom `images.csv` (`g:id;g:image_link`). Mergado ho importuje do Meta
 projektu a prepíše ním fotku produktu.
 
-- Feed: výstup projektu Google Nákupy [SK] v Mergade (dá sa prepísať premennou repozitára `FEED_URL`). Nie priamo web – GitHub server z USA dostane z futbalovysen.sk český feed s inými ID. Nie Meta feed z Mergada – ten už obsahuje vygenerované obrázky.
-- Ak feed nie je slovenský (odkazy mimo futbalovysen.sk), generovanie skončí chybou a ostanú posledné dobré obrázky.
+- Feed: https://futbalovysen.sk/?fs_feed=zapasy (dá sa prepísať premennou repozitára `FEED_URL`). Nie Meta feed z Mergada – ten už obsahuje vygenerované obrázky.
+- Web má chybu v cache: tá istá adresa niekedy vráti český feed (fotbalovysen.cz, iné ID). Generátor preto pridá do adresy `nocache` a skúša až 8× za sebou; keď slovenský feed nedostane, skončí chybou a ostanú posledné dobré obrázky.
 - Ručné spustenie: Actions → Meta obrázky → Run workflow
 - Náhľad bez internetu: `python generate.py --sample out`
 - Písmo Inter (SIL Open Font License), logo podľa dizajn manuálu.
