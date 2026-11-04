@@ -35,12 +35,20 @@ jobs:
         run: python generate.py "${{ vars.FEED_URL || 'https://futbalovysen.sk/?fs_feed=zapasy' }}" site "${{ steps.pages.outputs.base_url }}"
       - name: Publish preview to branch nahlad
         if: steps.render.outputs.skip != 'true'
+        # Náhľad je len pomôcka: keď GitHub pri pushi vráti chybu (500, commit_refs),
+        # skúsi to znova a ak ani tak nevyjde, beh pokračuje a obrázky sa nasadia.
+        continue-on-error: true
         run: |
           mkdir /tmp/nahlad && cp site/nahlad.jpg site/images.csv site/feed-sk.xml /tmp/nahlad/
           cd /tmp/nahlad && git init -q -b nahlad
           git -c user.name=github-actions -c user.email=actions@github.com commit -q --allow-empty -m nahlad
           git add -A && git -c user.name=github-actions -c user.email=actions@github.com commit -q -m "Náhľad"
-          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" nahlad
+          for wait in 5 15 30 0; do
+            git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" nahlad && exit 0
+            [ "$wait" -gt 0 ] && echo "push zlyhal, skúšam znova o ${wait}s" && sleep "$wait"
+          done
+          echo "::warning::Náhľad (vetva nahlad) sa nepodarilo nahrať, obrázky sa nasadzujú aj tak."
+          exit 1
       - uses: actions/upload-pages-artifact@v3
         if: steps.render.outputs.skip != 'true'
         with:
