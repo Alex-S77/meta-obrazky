@@ -11,3 +11,13 @@ projektu a prepíše ním fotku produktu.
 - Ručné spustenie: Actions → Meta obrázky → Run workflow
 - Náhľad bez internetu: `python generate.py --sample out`
 - Písmo Inter (SIL Open Font License), logo podľa dizajn manuálu.
+
+## Futbalové darčeky (futbalovedarceky.sk)
+
+V tom istom behu vyrobí obrázky aj pre Meta katalóg Darčekov (`darceky.py`) a zverejní ich v `darceky/` spolu s `darceky/images.csv`.
+
+- Štýl prepína premenná repozitára `DARCEKY_STYLE`: `C` = karta (predvolené), `A` = vianočný. Zmena sa prejaví pri ďalšom behu.
+- Zoznam produktov berie z výstupného feedu Meta projektu v Mergade (secret `DARCEKY_IDS_FEED`), fotky, názvy a ceny z feedu obchodu (secret `DARCEKY_PHOTO_FEED`). Bez týchto dvoch secretov sa Darčeky preskočia.
+- Fotky sa ukladajú do cache, takže sa sťahujú iba nové alebo zmenené.
+- Keď Darčeky zlyhajú, beh nič nenasadí a ostanú posledné dobré obrázky (Sen aj Darčeky).
+- Náhľad bez internetu: `python darceky.py --sample out C` (alebo `A`).
