@@ -52,19 +52,33 @@ jobs:
           fi
           # a failed Darčeky run must not deploy a site without its images: keep the last deploy
           python darceky.py site "${{ steps.pages.outputs.base_url }}" || echo "skip=true" >> "$GITHUB_OUTPUT"
+      - name: Render Darčeky CZ images
+        id: darceky_cz
+        env:
+          DARCEKY_COUNTRY: cz
+          DARCEKY_IDS_FEED: ${{ secrets.DARCEKY_CZ_IDS_FEED }}
+          DARCEKY_PHOTO_FEED: ${{ secrets.DARCEKY_CZ_PHOTO_FEED }}
+          DARCEKY_STYLE: ${{ vars.DARCEKY_STYLE || 'C' }}
+          PHOTO_CACHE: photo-cache
+        run: |
+          if [ -z "$DARCEKY_IDS_FEED" ] || [ -z "$DARCEKY_PHOTO_FEED" ]; then
+            echo "Darčeky CZ feeds not set, skipping"; exit 0
+          fi
+          python darceky.py site "${{ steps.pages.outputs.base_url }}" || echo "skip=true" >> "$GITHUB_OUTPUT"
       - name: Publish preview to branch nahlad
-        if: steps.render.outputs.skip != 'true' && steps.darceky.outputs.skip != 'true'
+        if: steps.render.outputs.skip != 'true' && steps.darceky.outputs.skip != 'true' && steps.darceky_cz.outputs.skip != 'true'
         run: |
           mkdir /tmp/nahlad && cp site/nahlad.jpg site/images.csv site/feed-sk.xml /tmp/nahlad/
           if [ -d site/darceky ]; then mkdir /tmp/nahlad/darceky && cp site/darceky/nahlad.jpg site/darceky/images.csv /tmp/nahlad/darceky/; fi
+          if [ -d site/darceky-cz ]; then mkdir /tmp/nahlad/darceky-cz && cp site/darceky-cz/nahlad.jpg site/darceky-cz/images.csv /tmp/nahlad/darceky-cz/; fi
           cd /tmp/nahlad && git init -q -b nahlad
           git -c user.name=github-actions -c user.email=actions@github.com commit -q --allow-empty -m nahlad
           git add -A && git -c user.name=github-actions -c user.email=actions@github.com commit -q -m "Náhľad"
           git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" nahlad
       - uses: actions/upload-pages-artifact@v3
-        if: steps.render.outputs.skip != 'true' && steps.darceky.outputs.skip != 'true'
+        if: steps.render.outputs.skip != 'true' && steps.darceky.outputs.skip != 'true' && steps.darceky_cz.outputs.skip != 'true'
         with:
           path: site
       - id: deploy
-        if: steps.render.outputs.skip != 'true' && steps.darceky.outputs.skip != 'true'
+        if: steps.render.outputs.skip != 'true' && steps.darceky.outputs.skip != 'true' && steps.darceky_cz.outputs.skip != 'true'
         uses: actions/deploy-pages@v4

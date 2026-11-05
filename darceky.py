@@ -16,6 +16,10 @@ Output: OUT_DIR/darceky/img/<id>-<hash>.jpg and OUT_DIR/darceky/images.csv
 (g:id;g:image_link) for the Mergado data import. Photos are cached in
 PHOTO_CACHE so each run only downloads new or changed photos.
 
+Country: DARCEKY_COUNTRY=sk (default, futbalovedarceky.sk, output in darceky/)
+or cz (fotbalovydarek.cz, Czech texts, output in darceky-cz/). The currency
+shown comes from the feed price (EUR -> €, CZK -> Kč).
+
 Usage: python darceky.py OUT_DIR BASE_URL
        python darceky.py --sample OUT_DIR [A|C]   (offline, uses assets/sample-photo.png)
 """
@@ -31,7 +35,19 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 W = 1080
 LIME, GREEN, NAVY, DARK = (160, 198, 19), (8, 153, 94), (29, 36, 51), (14, 19, 32)
 UA = {"User-Agent": "futbalovedarceky-meta-images/1.0"}
-LOGO = Image.open(os.path.join(HERE, "assets", "darceky-logo.png")).convert("RGBA")
+LOCALES = {
+    "sk": {"dir": "darceky", "logo": "darceky-logo.png", "sale": "Zľava z", "chip_kw": "potla",
+           "chip": "Potlač mena a čísla", "xmas": "DARČEK POD STROMČEK"},
+    "cz": {"dir": "darceky-cz", "logo": "darceky-logo-cz.png", "sale": "Sleva z", "chip_kw": "potis",
+           "chip": "Potisk jména a čísla", "xmas": "DÁREK POD STROMEČEK"},
+}
+COUNTRY = os.environ.get("DARCEKY_COUNTRY", "sk").strip().lower() or "sk"
+LOC = LOCALES[COUNTRY]
+_logo = os.path.join(HERE, "assets", LOC["logo"])
+if not os.path.exists(_logo):
+    _logo = os.path.join(HERE, "assets", "darceky-logo.png")
+LOGO = Image.open(_logo).convert("RGBA")
+CURRENCY = {"EUR": ("€", "EUR"), "CZK": ("Kč", "Kč")}  # code -> (after a number, under the price)
 VERSION = "v1"
 
 
@@ -65,7 +81,15 @@ def price_text(raw):
     m = re.search(r"\d+(?:[.,]\d+)?", raw or "")
     if not m:
         return ""
-    return f"{float(m.group().replace(',', '.')):.2f}".replace(".", ",")
+    v = float(m.group().replace(",", "."))
+    if currency(raw)[0] == "Kč":  # CZK: whole crowns, space as thousands separator
+        return f"{v:,.0f}".replace(",", " ")
+    return f"{v:.2f}".replace(".", ",")
+
+
+def currency(raw):
+    m = re.search(r"[A-Z]{3}", raw or "")
+    return CURRENCY.get(m.group() if m else "EUR", ("€", "EUR"))
 
 
 # ---------- drawing helpers ----------
@@ -138,7 +162,7 @@ def cutout(photo):
 
 def chip_for(p):
     t = (p.get("title", "") + " " + p.get("description", "")).lower()
-    return "Potlač mena a čísla" if "potla" in t else ""
+    return LOC["chip"] if LOC["chip_kw"] in t else ""
 
 
 # ---------- style C (karta) ----------
@@ -164,12 +188,13 @@ def render_c(p, photo):
     cx, cy, r = 900, 180, 118
     d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=NAVY)
     shown = sale or price
+    sym, label = currency(p.get("sale_price") or p.get("price"))
     if shown:
         f = font("Black", 54 if len(shown) <= 5 else 46)
         d.text((cx, cy - 8), shown, font=f, fill="white", anchor="mm")
-        d.text((cx, cy + 42), "EUR", font=font("Bold", 26), fill=LIME, anchor="mm")
+        d.text((cx, cy + 42), label, font=font("Bold", 26), fill=LIME, anchor="mm")
     if sale and price and sale != price:
-        tag = f"Zľava z {price} €"
+        tag = f"{LOC['sale']} {price} {currency(p.get('price'))[0]}"
         f2 = font("Bold", 24)
         tw = d.textlength(tag, font=f2)
         d.rounded_rectangle((cx - tw / 2 - 18, cy + r - 6, cx + tw / 2 + 18, cy + r + 40), radius=23, fill=LIME)
@@ -211,7 +236,7 @@ def render_a(p, photo):
         im.alpha_composite(sh.filter(ImageFilter.GaussianBlur(22)), (x - 60, y - 42))
         im.alpha_composite(pr, (x, y))
     d = ImageDraw.Draw(im)
-    d.text((70, 815), "DARČEK POD STROMČEK", font=font("Bold", 28), fill=LIME)
+    d.text((70, 815), LOC["xmas"], font=font("Bold", 28), fill=LIME)
     f = font("Black", 44)
     y0 = 860
     for ln in wrap(d, p.get("title", ""), f, 600):
@@ -219,7 +244,7 @@ def render_a(p, photo):
         y0 += 56
     shown = price_text(p.get("sale_price")) or price_text(p.get("price"))
     if shown:
-        txt = f"{shown} €"
+        txt = f"{shown} {currency(p.get('sale_price') or p.get('price'))[0]}"
         fp = font("Black", 58)
         tw = d.textlength(txt, font=fp)
         d.rounded_rectangle((W - 70 - tw - 64, 858, W - 70, 958), radius=50, fill=LIME)
@@ -269,7 +294,8 @@ def content_hash(p, style):
 
 def build(products, out_dir, base_url, cache_dir, style):
     render = STYLES[style]
-    img_dir = os.path.join(out_dir, "darceky", "img")
+    sub = LOC["dir"]
+    img_dir = os.path.join(out_dir, sub, "img")
     os.makedirs(img_dir, exist_ok=True)
     rows, ok = [], 0
     for p in products:
@@ -278,9 +304,9 @@ def build(products, out_dir, base_url, cache_dir, style):
             continue  # no photo: leave the product's own image in the feed
         name = f"{re.sub(r'[^A-Za-z0-9_-]', '_', p['id'])}-{content_hash(p, style)}.jpg"
         render(p, photo).save(os.path.join(img_dir, name), "JPEG", quality=88, optimize=True)
-        rows.append((p["id"], f"{base_url.rstrip('/')}/darceky/img/{name}"))
+        rows.append((p["id"], f"{base_url.rstrip('/')}/{sub}/img/{name}"))
         ok += 1
-    with open(os.path.join(out_dir, "darceky", "images.csv"), "w", newline="", encoding="utf-8") as fh:
+    with open(os.path.join(out_dir, sub, "images.csv"), "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh, delimiter=";")
         w.writerow(["g:id", "g:image_link"])
         w.writerows(rows)
@@ -288,8 +314,8 @@ def build(products, out_dir, base_url, cache_dir, style):
     for i, (_, url) in enumerate(rows[:12]):
         tile = Image.open(os.path.join(img_dir, url.rsplit("/", 1)[1])).resize((360, 360))
         sheet.paste(tile, ((i % 4) * 360, (i // 4) * 360))
-    sheet.save(os.path.join(out_dir, "darceky", "nahlad.jpg"), quality=85)
-    print(f"darceky: rendered {ok} of {len(products)} products (style {style})")
+    sheet.save(os.path.join(out_dir, sub, "nahlad.jpg"), quality=85)
+    print(f"{sub}: rendered {ok} of {len(products)} products (style {style})")
     return ok
 
 
@@ -302,10 +328,16 @@ def main():
         url = "file://sample"
         with open(photo_path(cache, url), "wb") as fh:
             fh.write(open(src, "rb").read())
-        items = [{"id": "SAMPLE1", "title": "Detský dres Yamal FC Barcelona 2026/27 domáci replika",
-                  "price": "27.90 EUR", "image_link": url},
-                 {"id": "SAMPLE2", "title": "Sada Slovensko pre deti a dospelých s potlačou",
-                  "price": "34.90 EUR", "sale_price": "29.90 EUR", "image_link": url}]
+        if COUNTRY == "cz":
+            items = [{"id": "SAMPLE1", "title": "Dětský dres Yamal FC Barcelona 2026/27 domácí replika",
+                      "price": "699.00 CZK", "image_link": url},
+                     {"id": "SAMPLE2", "title": "Sada Česko pro děti a dospělé s potiskem",
+                      "price": "1290.00 CZK", "sale_price": "990.00 CZK", "image_link": url}]
+        else:
+            items = [{"id": "SAMPLE1", "title": "Detský dres Yamal FC Barcelona 2026/27 domáci replika",
+                      "price": "27.90 EUR", "image_link": url},
+                     {"id": "SAMPLE2", "title": "Sada Slovensko pre deti a dospelých s potlačou",
+                      "price": "34.90 EUR", "sale_price": "29.90 EUR", "image_link": url}]
         build(items, out, "https://example.invalid", cache, style)
         return
     out, base_url = sys.argv[1:3]
